@@ -5,8 +5,10 @@ label_bot/extra_data/
 token_private.json
 *.pkl
 label_bot/models/
+label_bot/._models
 *.tar.gz
 *.DS_Store
 *.png
 *.bin
 __pycache__
+.vscode/settings.json
