@@ -16,7 +16,7 @@
 
 from pathlib import Path
 from setuptools import setup, find_packages
-
+from __init__ import __version__
 
 
 def get_install_requires():
@@ -24,14 +24,12 @@ def get_install_requires():
         res = requirements_file.readlines()
         return [req.split(" ", maxsplit=1)[0].replace(";", "") for req in res if req]
 
-
-
 setup(
-    name="git-label",
-    entry_points={"console_scripts": ["git-label=app:cli"]},
-    long_description=Path("README.md").read_text(),
-    author="Giorgos Karantonis",
-    author_email="gkaranto@redhat.com, giorgos@bu.edu",
+    name='Label Bot Server',
+    version=__version__,
+    description='Label Bot Server',
+    author='Thoth Devs',
+    author_email='aicoe-thoth@redhat.com',
     packages=find_packages(),
     install_requires=get_install_requires(),
 )
