@@ -75,3 +75,19 @@ If you are interested in improving the performance of the classifier, I would re
 * **Use the paraphrase detection component to get better clusters than mine.** Despite all the workarounds used, you can further improve the performance by providing a cleaner and more consistent dataset. 
 
 Also, if you are interested in improving the performance feel free to contact me! 🙂 
+
+
+## Notes to run as an API
+
+* `pipenv install --dev` to install all dependencies. 
+* `chmod +x fetch_models.sh` and `./fetch_models.sh` to get the pretrained models. 
+* Finally inside the pipenv shell, `python3 server.py`
+* Now that your server is running try a sample curl request to test the label bot -  
+`
+curl --location --request POST 'http://localhost:8888/predict' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+    "title": "New features added",
+    "body": "More colors"
+}'
+`
