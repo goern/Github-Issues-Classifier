@@ -20,6 +20,7 @@ torch = "==1.6.0"
 tensorboardX = "2.1"
 click = "*"
 pygithub = "*"
+tornado = "*"
 
 [requires]
 python_version = "3.8"
