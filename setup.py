@@ -24,12 +24,13 @@ def get_install_requires():
         res = requirements_file.readlines()
         return [req.split(" ", maxsplit=1)[0].replace(";", "") for req in res if req]
 
+
 setup(
-    name='Label Bot Server',
+    name="Label Bot Server",
     version=__version__,
-    description='Label Bot Server',
-    author='Thoth Devs',
-    author_email='aicoe-thoth@redhat.com',
+    description="Label Bot Server",
+    author="Thoth Devs",
+    author_email="aicoe-thoth@redhat.com",
     packages=find_packages(),
     install_requires=get_install_requires(),
 )

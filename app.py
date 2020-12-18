@@ -14,11 +14,12 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-'''
+"""
     A CLI tool for the classifier.
-'''
+"""
 
 import os
+
 os.environ["WANDB_SILENT"] = "true"
 
 import json
@@ -31,11 +32,10 @@ from github import Github
 from label_bot import models
 
 
-
 def init_models(ctx, param, value):
-    '''
-        Initializes the trained model.
-    '''
+    """
+    Initializes the trained model.
+    """
     global BOT
 
     if not value or ctx.resilient_parsing:
@@ -45,9 +45,9 @@ def init_models(ctx, param, value):
 
 
 def set_token(ctx, param, value):
-    '''
-        Pass the token as a CLI argument.
-    '''
+    """
+    Pass the token as a CLI argument.
+    """
     global token
 
     if not value or ctx.resilient_parsing:
@@ -57,15 +57,15 @@ def set_token(ctx, param, value):
             print("Exiting, no token found...")
 
         return
-    
+
     token = value
 
 
 def get_token(file="token.json"):
-    '''
-        Finds and the returns the personal access token
-        from the ./token.json file.
-    '''
+    """
+    Finds and the returns the personal access token
+    from the ./token.json file.
+    """
     with open(file) as f:
         token = json.load(f)["token"]
 
@@ -73,29 +73,31 @@ def get_token(file="token.json"):
 
 
 def predict(title, body):
-    '''
-        Returns the prediction scores.
+    """
+    Returns the prediction scores.
 
-        args:
-            title : the titles of the issues.
-            body  : the bodies of the issues.
-    '''
+    args:
+        title : the titles of the issues.
+        body  : the bodies of the issues.
+    """
     return BOT.predict(title, body)[0]
 
 
 @click.group()
 @click.option("--token", "-t", callback=set_token, expose_value=False)
-@click.option("--use-head", "-h", is_flag=True, callback=init_models, expose_value=False)
-@click.option("--threshold", "-th", default=.5, type=float)
+@click.option(
+    "--use-head", "-h", is_flag=True, callback=init_models, expose_value=False
+)
+@click.option("--threshold", "-th", default=0.5, type=float)
 @click.option("--apply-labels", "-l", is_flag=True)
 def cli(threshold, apply_labels):
-    '''
-        The CLI tool for the classifier.
+    """
+    The CLI tool for the classifier.
 
-        args:
-            threshold    : the decision threshold.
-            apply_labels : whether or not to set the labels on all the visited issues.
-    '''
+    args:
+        threshold    : the decision threshold.
+        apply_labels : whether or not to set the labels on all the visited issues.
+    """
     global THRESHOLD, APPLY_LABELS
 
     THRESHOLD = threshold
@@ -107,13 +109,13 @@ def cli(threshold, apply_labels):
 @cli.command("crawl-org")
 @click.option("--organization", "-o")
 def run_on_org(organization):
-    '''
-        Runs the classifier on all the issues 
-        opened on all the repos of a certain organization.
+    """
+    Runs the classifier on all the issues
+    opened on all the repos of a certain organization.
 
-        args:
-            organization : the organization.
-    '''
+    args:
+        organization : the organization.
+    """
     results = pd.DataFrame(columns=["repo", "issue", "bug", "question", "enhancement"])
 
     token = get_token()
@@ -124,18 +126,24 @@ def run_on_org(organization):
     for repo in root.get_repos():
         for issue in repo.get_issues():
             b_score, q_score, e_score = predict(issue.title, issue.body)
-            
+
             if APPLY_LABELS:
-                for l, s in zip(("bug", "question", "enhancement"), (b_score, q_score, e_score)):
+                for l, s in zip(
+                    ("bug", "question", "enhancement"), (b_score, q_score, e_score)
+                ):
                     if s >= THRESHOLD:
                         issue.set_labels(l)
-            
-            results = results.append({"repo" : repo.name,
-                                      "issue" : issue.number,
-                                      "bug" : b_score,
-                                      "question" : q_score,
-                                      "enhancement" : e_score
-                                    }, ignore_index=True)
+
+            results = results.append(
+                {
+                    "repo": repo.name,
+                    "issue": issue.number,
+                    "bug": b_score,
+                    "question": q_score,
+                    "enhancement": e_score,
+                },
+                ignore_index=True,
+            )
 
     return results
 
@@ -143,13 +151,13 @@ def run_on_org(organization):
 @cli.command("crawl-user")
 @click.option("--user", "-u")
 def run_on_user(user):
-    '''
-        Runs the classifier on all the issues 
-        opened on all the repos of a certain user.
+    """
+    Runs the classifier on all the issues
+    opened on all the repos of a certain user.
 
-        args:
-            user : the user.
-    '''
+    args:
+        user : the user.
+    """
     results = pd.DataFrame(columns=["repo", "issue", "bug", "question", "enhancement"])
 
     token = get_token()
@@ -162,16 +170,22 @@ def run_on_user(user):
             b_score, q_score, e_score = predict(issue.title, issue.body)
 
             if APPLY_LABELS:
-                for l, s in zip(("bug", "question", "enhancement"), (b_score, q_score, e_score)):
+                for l, s in zip(
+                    ("bug", "question", "enhancement"), (b_score, q_score, e_score)
+                ):
                     if s >= THRESHOLD:
                         issue.set_labels(l)
 
-            results = results.append({"repo" : repo.name,
-                                      "issue" : issue.number,
-                                      "bug" : b_score,
-                                      "question" : q_score,
-                                      "enhancement" : e_score
-                                    }, ignore_index=True)
+            results = results.append(
+                {
+                    "repo": repo.name,
+                    "issue": issue.number,
+                    "bug": b_score,
+                    "question": q_score,
+                    "enhancement": e_score,
+                },
+                ignore_index=True,
+            )
 
     return results
 
@@ -179,12 +193,12 @@ def run_on_user(user):
 @cli.command("crawl-repo")
 @click.option("--repo", "-r")
 def run_on_repo(repo):
-    '''
-        Runs the classifier on all the issues of a specific repo.
+    """
+    Runs the classifier on all the issues of a specific repo.
 
-        args:
-            repo : the repo name.
-    '''
+    args:
+        repo : the repo name.
+    """
     results = pd.DataFrame(columns=["repo", "issue", "bug", "question", "enhancement"])
 
     token = get_token()
@@ -196,16 +210,22 @@ def run_on_repo(repo):
         b_score, q_score, e_score = predict(issue.title, issue.body)
 
         if APPLY_LABELS:
-            for l, s in zip(("bug", "question", "enhancement"), (b_score, q_score, e_score)):
+            for l, s in zip(
+                ("bug", "question", "enhancement"), (b_score, q_score, e_score)
+            ):
                 if s >= THRESHOLD:
                     issue.set_labels(l)
-        
-        results = results.append({"repo" : repo.name,
-                                  "issue" : issue.number,
-                                  "bug" : b_score,
-                                  "question" : q_score,
-                                  "enhancement" : e_score
-                                }, ignore_index=True)
+
+        results = results.append(
+            {
+                "repo": repo.name,
+                "issue": issue.number,
+                "bug": b_score,
+                "question": q_score,
+                "enhancement": e_score,
+            },
+            ignore_index=True,
+        )
 
     return results
 
@@ -214,13 +234,13 @@ def run_on_repo(repo):
 @click.option("--repo", "-r")
 @click.option("--issue", "-i")
 def run_on_issue(repo, issue):
-    '''
-        Runs the classifier on a specific issue.
+    """
+    Runs the classifier on a specific issue.
 
-        args:
-            repo  : the repo where the issue is opened.
-            issue : the issue number.
-    '''
+    args:
+        repo  : the repo where the issue is opened.
+        issue : the issue number.
+    """
     results = pd.DataFrame(columns=["repo", "issue", "bug", "question", "enhancement"])
 
     token = get_token()
@@ -232,24 +252,30 @@ def run_on_issue(repo, issue):
     b_score, q_score, e_score = predict(issue.title, issue.body)
 
     if APPLY_LABELS:
-        for l, s in zip(("bug", "question", "enhancement"), (b_score, q_score, e_score)):
+        for l, s in zip(
+            ("bug", "question", "enhancement"), (b_score, q_score, e_score)
+        ):
             if s >= THRESHOLD:
                 issue.set_labels(l)
 
-    results = results.append({"repo" : repo.name,
-                              "issue" : issue.number,
-                              "bug" : b_score,
-                              "question" : q_score,
-                              "enhancement" : e_score
-                            }, ignore_index=True)
+    results = results.append(
+        {
+            "repo": repo.name,
+            "issue": issue.number,
+            "bug": b_score,
+            "question": q_score,
+            "enhancement": e_score,
+        },
+        ignore_index=True,
+    )
 
     return results
 
 
 def demo():
-    '''
-        A simple demo function.
-    '''
+    """
+    A simple demo function.
+    """
     title = input("Title: ")
     body = input("Body: ")
 
@@ -262,8 +288,8 @@ def demo():
     keep_going = input("Try another one? [y/n] ")
 
     while keep_going not in ("y", "n"):
-      print("Type 'y' for YES or 'n' for NO")
-      keep_going = input("Try another one? [y/n] ")
+        print("Type 'y' for YES or 'n' for NO")
+        keep_going = input("Try another one? [y/n] ")
 
     if keep_going == "y":
         demo()
@@ -274,7 +300,6 @@ def demo():
 @cli.command("demo")
 def start_demo():
     demo()
-
 
 
 if __name__ == "__main__":

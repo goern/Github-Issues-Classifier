@@ -14,13 +14,14 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-'''
+"""
     The paraphrase detection component.
-'''
+"""
 
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-os.environ['WANDB_SILENT'] = 'true'
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+os.environ["WANDB_SILENT"] = "true"
 
 import json
 import click
@@ -35,27 +36,32 @@ from transformers import BertTokenizer, TFBertForSequenceClassification
 from utils import get_n_chunks
 
 
-logging.getLogger('transformers').setLevel(logging.ERROR)
-
+logging.getLogger("transformers").setLevel(logging.ERROR)
 
 
 def clean_labels(labels):
-    '''
-        Cleans the labels observed in the dataset.
+    """
+    Cleans the labels observed in the dataset.
 
-        args :
-            labels : a pd.Series object of the observed labels.
+    args :
+        labels : a pd.Series object of the observed labels.
 
-        returns :
-            labels_fixed : the cleaned labels cast as a pd.Series object.
-    '''
-    print('Cleaning Labels...\n')
+    returns :
+        labels_fixed : the cleaned labels cast as a pd.Series object.
+    """
+    print("Cleaning Labels...\n")
 
     labels_fixed = []
 
     for i, label_set in enumerate(labels):
         # convert labels from string to list
-        label_set = label_set.lower().replace('[', '').replace(']', '').replace('"', '').split(', ')
+        label_set = (
+            label_set.lower()
+            .replace("[", "")
+            .replace("]", "")
+            .replace('"', "")
+            .split(", ")
+        )
 
         # keep only unique labels
         label_set = set(label_set)
@@ -70,16 +76,16 @@ def clean_labels(labels):
 
 
 def get_target_labels():
-    '''
-        Gets the target labels and their aliases.
+    """
+    Gets the target labels and their aliases.
 
-        returns :
-            aliases       : all the aliases of the target labels
-                            that will be used during the clustering.
-            target_labels : the unique target labels.
-            label_mapping : the rules of how to map the labels.
-    '''
-    with open(os.path.join('..', 'labels.json')) as f:
+    returns :
+        aliases       : all the aliases of the target labels
+                        that will be used during the clustering.
+        target_labels : the unique target labels.
+        label_mapping : the rules of how to map the labels.
+    """
+    with open(os.path.join("..", "labels.json")) as f:
         label_mapping = json.load(f)
 
     aliases = set([k for k in label_mapping.keys()])
@@ -88,26 +94,26 @@ def get_target_labels():
     return aliases, target_labels, label_mapping
 
 
-def disambiguate_labels(labels_dict, disambiguate='keep_most_probable'):
-    '''
-        Deals with conflicts in the label mapping.
+def disambiguate_labels(labels_dict, disambiguate="keep_most_probable"):
+    """
+    Deals with conflicts in the label mapping.
 
-        args :
-            labels_dict  : a dictionary containing the observed labels 
-                           and all their possible substitutions.
-            disambiguate : how to deal with conficts; 
-                           either keep only the most probable label, 
-                           or drop all of the possible labels.
-    '''
-    print('Disambiguating Labels...\n')
+    args :
+        labels_dict  : a dictionary containing the observed labels
+                       and all their possible substitutions.
+        disambiguate : how to deal with conficts;
+                       either keep only the most probable label,
+                       or drop all of the possible labels.
+    """
+    print("Disambiguating Labels...\n")
 
-    assert disambiguate in ['keep_most_probable', 'drop_all']
+    assert disambiguate in ["keep_most_probable", "drop_all"]
 
     cleaned_dict = {}
 
     for key in labels_dict:
         if len(labels_dict[key]) > 1:
-            if disambiguate == 'drop_all':
+            if disambiguate == "drop_all":
                 cleaned_dict[key] = None
             else:
                 max_likelihood = 0
@@ -117,32 +123,32 @@ def disambiguate_labels(labels_dict, disambiguate='keep_most_probable'):
                     if likelihood > max_likelihood:
                         max_likelihood = likelihood
                         best_match = label
-                
+
                 cleaned_dict[key] = best_match
         else:
             label, likelihood = labels_dict[key][0]
             cleaned_dict[key] = label
-    
+
     return cleaned_dict
 
 
 def map_labels(label_series, mapping):
-    '''
-        Replaces the observed labels with their corresponding target ones.
+    """
+    Replaces the observed labels with their corresponding target ones.
 
-        args :
-            label_series : the pd.Series object containing the observed labels
-            mapping      : the mapping rule obtained my the get_mapping() function.
+    args :
+        label_series : the pd.Series object containing the observed labels
+        mapping      : the mapping rule obtained my the get_mapping() function.
 
-        returns :
-            mapped_labels : a modified list of labels, such that the observed ones
-                            are mapped to their corresponding targets or to nothing, 
-                            cast as a pd.Series object.
-    '''
-    print('Mappping Labels...\n')
+    returns :
+        mapped_labels : a modified list of labels, such that the observed ones
+                        are mapped to their corresponding targets or to nothing,
+                        cast as a pd.Series object.
+    """
+    print("Mappping Labels...\n")
 
     mapped_labels = []
-    
+
     for i, label_list in enumerate(label_series):
         temp_labels = []
 
@@ -151,35 +157,35 @@ def map_labels(label_series, mapping):
                 temp_labels.append(mapping[l])
             except:
                 pass
-        
+
         if temp_labels:
             mapped_labels.append(temp_labels)
         else:
-            mapped_labels.append(['undefined'])
+            mapped_labels.append(["undefined"])
 
     return pd.Series(mapped_labels)
 
 
-def get_mapping(paraphrase_candidates, paraphrase_likelihood, threshold=.5):
-    '''
-        Finds the mapping of labels observed in the dataset to target labels.
+def get_mapping(paraphrase_candidates, paraphrase_likelihood, threshold=0.5):
+    """
+    Finds the mapping of labels observed in the dataset to target labels.
 
-        args : 
-            paraphrase_candidates : combinations of target and observed labels.
-            paraphrase_likelihood : the probability, for each combination, 
-                                    of being a paraphrase.
-            threshold             : the minimum probability to consider a combination paraphrase.
+    args :
+        paraphrase_candidates : combinations of target and observed labels.
+        paraphrase_likelihood : the probability, for each combination,
+                                of being a paraphrase.
+        threshold             : the minimum probability to consider a combination paraphrase.
 
-        returns :
-            label_mapping : a dictionary containing observed labels and their 
-                            corresponding target label.
-    '''
+    returns :
+        label_mapping : a dictionary containing observed labels and their
+                        corresponding target label.
+    """
     label_mapping = {}
-    
+
     for pair, pair_likelihood in zip(paraphrase_candidates, paraphrase_likelihood):
         if pair_likelihood > threshold:
             target_l, real_l = pair[0], pair[1]
-            
+
             try:
                 label_mapping[real_l].append((LABELS[target_l], pair_likelihood))
             except:
@@ -190,20 +196,20 @@ def get_mapping(paraphrase_candidates, paraphrase_likelihood, threshold=.5):
 
 
 def make_combinations(targets, observed):
-    '''
-        Creates combinations of target labels and observed ones.
+    """
+    Creates combinations of target labels and observed ones.
 
-        args :
-            targets  : the target labels.
-            observed : the unique labels observed in the dataset.
+    args :
+        targets  : the target labels.
+        observed : the unique labels observed in the dataset.
 
-        returns :
-            combinations : the combinations of target and observed labels.
-    '''
-    print('Creating Label Combinations...\n')
+    returns :
+        combinations : the combinations of target and observed labels.
+    """
+    print("Creating Label Combinations...\n")
 
     combinations = []
-    
+
     for t in targets:
         for o in observed:
             combinations.append([t, o])
@@ -212,45 +218,49 @@ def make_combinations(targets, observed):
 
 
 def check_paraphrase(inputs, low_memory=True, chunk_size=1000):
-    '''
-        Finds the likelihood of a combination of strings to be a paraphrase.
+    """
+    Finds the likelihood of a combination of strings to be a paraphrase.
 
-        args :
-            inputs : a combination of strings.
-            low_memory : if you want to split the inputs
-                         to batches in order to avoid OOM issues.
-            chunk_size : the batch size in case low_memory is set to True.
+    args :
+        inputs : a combination of strings.
+        low_memory : if you want to split the inputs
+                     to batches in order to avoid OOM issues.
+        chunk_size : the batch size in case low_memory is set to True.
 
-        returns :
-            paraphrase_likelihood : the probability, for each combination,
-                                    of being a paraphrase.
+    returns :
+        paraphrase_likelihood : the probability, for each combination,
+                                of being a paraphrase.
 
-    '''
-    print('Checking for Paraphrase...\n') 
+    """
+    print("Checking for Paraphrase...\n")
 
-    tokenizer = BertTokenizer.from_pretrained('bert-base-cased-finetuned-mrpc', output_loading_info=False)
-    model = TFBertForSequenceClassification.from_pretrained('bert-base-cased-finetuned-mrpc', output_loading_info=False)    
+    tokenizer = BertTokenizer.from_pretrained(
+        "bert-base-cased-finetuned-mrpc", output_loading_info=False
+    )
+    model = TFBertForSequenceClassification.from_pretrained(
+        "bert-base-cased-finetuned-mrpc", output_loading_info=False
+    )
 
     if low_memory:
         n_chunks = get_n_chunks(inputs, chunk_size)
-        
+
         paraphrase_likelihood = np.array([])
 
         for i in range(n_chunks):
             from time import time
+
             start = time()
 
-            print(f'Chunk: {i+1}/{n_chunks}\r', end='')
+            print(f"Chunk: {i+1}/{n_chunks}\r", end="")
 
             try:
-                cur_inputs = inputs[i*chunk_size:(i+1)*chunk_size]
+                cur_inputs = inputs[i * chunk_size : (i + 1) * chunk_size]
             except IndexError:
-                cur_inputs = inputs[i*chunk_size:]
+                cur_inputs = inputs[i * chunk_size :]
 
-            cur_inputs = tokenizer(cur_inputs, 
-                                   padding=True, 
-                                   truncation=True, 
-                                   return_tensors='tf')
+            cur_inputs = tokenizer(
+                cur_inputs, padding=True, truncation=True, return_tensors="tf"
+            )
 
             logits = model(cur_inputs)[0]
             outputs = tf.nn.softmax(logits, axis=1).numpy()
@@ -259,13 +269,11 @@ def check_paraphrase(inputs, low_memory=True, chunk_size=1000):
 
             return paraphrase_likelihood
 
-
-            print(f'Time elapsed for chunk {i}: {time() - start}sec')
+            print(f"Time elapsed for chunk {i}: {time() - start}sec")
     else:
-        cur_inputs = tokenizer(cur_inputs, 
-                               padding=True, 
-                               truncation=True, 
-                               return_tensors='tf')
+        cur_inputs = tokenizer(
+            cur_inputs, padding=True, truncation=True, return_tensors="tf"
+        )
 
         logits = model(cur_inputs)[0]
         outputs = tf.nn.softmax(logits, axis=1).numpy()
@@ -276,17 +284,17 @@ def check_paraphrase(inputs, low_memory=True, chunk_size=1000):
 
 
 def main(label_series):
-    '''
-        The main function that handles the alignment of the labels.
+    """
+    The main function that handles the alignment of the labels.
 
-        args :
-            label_series : a pd.Series object containing all the labels 
-                           as they are observed in the dataset.
+    args :
+        label_series : a pd.Series object containing all the labels
+                       as they are observed in the dataset.
 
-        returns :
-            label_series  : a pd.Series object containing the mapped labels.
-            target_labels : a set containing all the unique target labels.
-    '''
+    returns :
+        label_series  : a pd.Series object containing the mapped labels.
+        target_labels : a set containing all the unique target labels.
+    """
     global LABELS
     aliases, target_labels, LABELS = get_target_labels()
 
@@ -300,23 +308,22 @@ def main(label_series):
     label_mapping = disambiguate_labels(label_mapping)
     label_series = map_labels(label_series, label_mapping)
 
-    if 'undefined' not in target_labels:
-        target_labels.add('undefined')
+    if "undefined" not in target_labels:
+        target_labels.add("undefined")
 
     return label_series, target_labels
 
 
 @click.command()
-@click.option('--limit', '-L', default=None, type=int)
-@click.option('--file', '-F', default='data/github_raw.pkl', type=str)
+@click.option("--limit", "-L", default=None, type=int)
+@click.option("--file", "-F", default="data/github_raw.pkl", type=str)
 def cli(limit, file):
-    '''
-        A CLI tool for the paraphrase detection component.
-    '''
-    label_series = pd.read_pickle(file)['labels'][:limit]
+    """
+    A CLI tool for the paraphrase detection component.
+    """
+    label_series = pd.read_pickle(file)["labels"][:limit]
     label_series, LABELS = main(label_series)
 
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     cli()

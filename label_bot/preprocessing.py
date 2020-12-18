@@ -23,26 +23,31 @@ import pandas as pd
 import paraphrase_detector
 
 
+def download_data(
+    memory_limit=None,
+    save=True,
+    base_url="https://storage.googleapis.com/codenet/issue_labels/00000000000",
+):
+    """
+    Downloads the raw dataset.
+    """
+    print("Downloading Dataset...\n")
 
-def download_data(memory_limit=None, save=True, base_url='https://storage.googleapis.com/codenet/issue_labels/00000000000'):
-    '''
-        Downloads the raw dataset.
-    '''
-    print('Downloading Dataset...\n')
-
-    df = pd.concat([pd.read_csv(f'{base_url}{i}.csv.gz') for i in range(10)])[:memory_limit]
+    df = pd.concat([pd.read_csv(f"{base_url}{i}.csv.gz") for i in range(10)])[
+        :memory_limit
+    ]
 
     if save:
-        df.to_pickle('data/github_raw.pkl')
+        df.to_pickle("data/github_raw.pkl")
 
     return df
 
 
 def drop_columns(df, *columns):
-    '''
-        Drops specific columns from a dataframe.
-    '''
-    print('Removing Redundant Columns...\n')
+    """
+    Drops specific columns from a dataframe.
+    """
+    print("Removing Redundant Columns...\n")
 
     for c in columns:
         try:
@@ -55,16 +60,22 @@ def drop_columns(df, *columns):
 
 
 def clean_labels(labels):
-    '''
-        Cleans the labels columns of the raw dataset.
-    '''
-    print('Cleaning Labels...\n')
+    """
+    Cleans the labels columns of the raw dataset.
+    """
+    print("Cleaning Labels...\n")
 
     labels_fixed = []
 
     for i, label_set in enumerate(labels):
         # convert labels from string to list
-        label_set = label_set.lower().replace('[', '').replace(']', '').replace('"', '').split(', ')
+        label_set = (
+            label_set.lower()
+            .replace("[", "")
+            .replace("]", "")
+            .replace('"', "")
+            .split(", ")
+        )
 
         # keep only unique labels
         label_set = set(label_set)
@@ -79,74 +90,76 @@ def clean_labels(labels):
 
 
 def get_reference_info(df):
-    '''
-        Gets the repo and the owner of the repo for each issue.
-    '''
-    print('Getting Issue Info...\n')
+    """
+    Gets the repo and the owner of the repo for each issue.
+    """
+    print("Getting Issue Info...\n")
 
-    reference_df = df['url'].str.extract(r'.*github\.com/(?P<user>.+)/(?P<repo_name>.+)/issues/(?P<issue_number>\d+)')
+    reference_df = df["url"].str.extract(
+        r".*github\.com/(?P<user>.+)/(?P<repo_name>.+)/issues/(?P<issue_number>\d+)"
+    )
 
     df = transform(df, to_add=[reference_df[feature] for feature in reference_df])
 
     return df
 
 
-def min_presence(df, feature='labels', p=.001):
-    '''
-        Drops examples that fall into classes that contain very few examples.
-    '''
-    print('Filtering out Redundant Labels...\n')
+def min_presence(df, feature="labels", p=0.001):
+    """
+    Drops examples that fall into classes that contain very few examples.
+    """
+    print("Filtering out Redundant Labels...\n")
 
     thresh = int(p * len(df))
-    
+
     features_count = get_unique_values(df, feature)
     n_features = features_count.where(features_count.values >= thresh).dropna()
-    
+
     return n_features.keys().values, n_features.values
 
 
 def vectorize(s, values, prefix=None):
-    '''
-        Gets the multi-hot embeddings for the labels.
-    '''
-    print('Vectorizing Features...\n')
+    """
+    Gets the multi-hot embeddings for the labels.
+    """
+    print("Vectorizing Features...\n")
 
     series_length = len(s)
     labels_df = pd.DataFrame(np.zeros((len(s), len(values))), columns=values)
-    
+
     for i, label_set in enumerate(s):
-        print(f'{i+1} / {series_length}\r', end='')
-        
+        print(f"{i+1} / {series_length}\r", end="")
+
         for l in label_set:
             labels_df.iloc[i][l] = 1
 
     if prefix:
-        labels_df.columns = [f'{prefix}_{v}' for v in values]
+        labels_df.columns = [f"{prefix}_{v}" for v in values]
 
     return labels_df
 
 
 def clean_text_data(df, *features):
-    '''
-        Removes the string literal prefix from the bodies and the titles.
-    '''
-    print('Cleaning Text Data...\n')
+    """
+    Removes the string literal prefix from the bodies and the titles.
+    """
+    print("Cleaning Text Data...\n")
 
     for feature in features:
-        df[feature] = df[feature].str.replace(r'\\r', '').str.lower()
-        df[feature] = df[feature].str.split().str.join(' ')
+        df[feature] = df[feature].str.replace(r"\\r", "").str.lower()
+        df[feature] = df[feature].str.split().str.join(" ")
 
     return df
 
 
 def transform(df, **kwargs):
-    '''
-        Adds and removes certain columns from the dataframe.
-    '''
-    print('Transforming DataFrame...\n')
+    """
+    Adds and removes certain columns from the dataframe.
+    """
+    print("Transforming DataFrame...\n")
 
     try:
-        for feature in kwargs['to_add']:
+        for feature in kwargs["to_add"]:
             df.reset_index(drop=True, inplace=True)
             feature.reset_index(drop=True, inplace=True)
 
@@ -155,79 +168,90 @@ def transform(df, **kwargs):
         pass
 
     try:
-        df = drop_columns(df, kwargs['to_drop'])
+        df = drop_columns(df, kwargs["to_drop"])
     except KeyError:
         pass
 
     return df
 
 
-def preprocess(df, save=True, save_to='data/github.pkl'):
-    '''
-        The main function for the preprocessing of the dataset.
-    '''
-    df['url'] = df['url'].str.replace('"', '')
-    
+def preprocess(df, save=True, save_to="data/github.pkl"):
+    """
+    The main function for the preprocessing of the dataset.
+    """
+    df["url"] = df["url"].str.replace('"', "")
+
     df = get_reference_info(df)
-    
-    df = drop_columns(df, 'repo', 'num_labels', 'c_bug', 'c_feature', 'c_question', 'class_int')
-    
+
+    df = drop_columns(
+        df, "repo", "num_labels", "c_bug", "c_feature", "c_question", "class_int"
+    )
+
     # df['labels'] = clean_labels(df['labels'].values)
-    
-    df = clean_text_data(df, 'title', 'body')
 
-    df['labels'], LABELS = paraphrase_detector.main(df['labels'])
+    df = clean_text_data(df, "title", "body")
 
-    labels_vectorized = vectorize(df['labels'], LABELS, prefix='label')
+    df["labels"], LABELS = paraphrase_detector.main(df["labels"])
+
+    labels_vectorized = vectorize(df["labels"], LABELS, prefix="label")
     df = transform(df, to_add=[labels_vectorized])
 
     if save:
-      df.to_pickle(save_to)
+        df.to_pickle(save_to)
 
     return df
 
 
-def fetch_github_data(look_for_downloaded=True, memory_limit=None, base_url='https://storage.googleapis.com/codenet/issue_labels/00000000000'):
-    '''
-        Either loads the raw dataset if its already downloaded or downloads it from scratch.
-    '''
+def fetch_github_data(
+    look_for_downloaded=True,
+    memory_limit=None,
+    base_url="https://storage.googleapis.com/codenet/issue_labels/00000000000",
+):
+    """
+    Either loads the raw dataset if its already downloaded or downloads it from scratch.
+    """
     if look_for_downloaded:
         try:
-            df = pd.read_pickle('data/github_raw.pkl')[:memory_limit]
+            df = pd.read_pickle("data/github_raw.pkl")[:memory_limit]
         except:
-            df = download_data(memory_limit=memory_limit, base_url=base_url)[:memory_limit]
+            df = download_data(memory_limit=memory_limit, base_url=base_url)[
+                :memory_limit
+            ]
     else:
         df = download_data(memory_limit=memory_limit, base_url=base_url)[:memory_limit]
 
     return df
 
 
-def load_data(fetch=False, memory_limit=None, file='data/github.pkl', base_url='https://storage.googleapis.com/codenet/issue_labels/00000000000'):
-    '''
-        Loads the dataset.
-    '''
-    return fetch_github_data(memory_limit=memory_limit, base_url=base_url) if fetch else pd.read_pickle(file)[:memory_limit]
+def load_data(
+    fetch=False,
+    memory_limit=None,
+    file="data/github.pkl",
+    base_url="https://storage.googleapis.com/codenet/issue_labels/00000000000",
+):
+    """
+    Loads the dataset.
+    """
+    return (
+        fetch_github_data(memory_limit=memory_limit, base_url=base_url)
+        if fetch
+        else pd.read_pickle(file)[:memory_limit]
+    )
 
 
 @click.command()
-@click.option('--fetch', '-F', default=False, type=bool)
-@click.option('--limit', '-L', default=None, type=int)
+@click.option("--fetch", "-F", default=False, type=bool)
+@click.option("--limit", "-L", default=None, type=int)
 def cli(fetch, limit):
-    '''
-        A CLI tool for the preprocessing of the dataset.
-    '''
-    if not os.path.exists('data'):
-        os.mkdir('data')
+    """
+    A CLI tool for the preprocessing of the dataset.
+    """
+    if not os.path.exists("data"):
+        os.mkdir("data")
 
     df = load_data(fetch=fetch, memory_limit=limit)
     df = preprocess(df)
 
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     cli()
-
-
-    
-
-

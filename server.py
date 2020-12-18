@@ -12,6 +12,7 @@ from __init__ import __version__
 from label_bot import models
 
 import os
+
 os.environ["WANDB_SILENT"] = "true"
 
 define("port", default=8888, help="port to listen on")
@@ -41,33 +42,31 @@ class PredictHandler(RequestHandler):
             body  : the bodies of the issues.
         """
         return BOT.predict(title, body)[0]
-    
+
     async def post(self):
         req = json_decode(self.request.body)
-        title = req.get('title', '')
-        body = req.get('body', '')
+        title = req.get("title", "")
+        body = req.get("body", "")
 
         b_score, q_score, e_score = await self.predict(title, body)
         response = {
-                    "title" : title,
-                    "body" : body,
-                    "bug" : str(b_score),
-                    "question" : str(q_score),
-                    "enhancement" : str(e_score)
-                }
+            "title": title,
+            "body": body,
+            "bug": str(b_score),
+            "question": str(q_score),
+            "enhancement": str(e_score),
+        }
         self.write(response)
         self.finish()
 
 
-class MainHandler(RequestHandler):   
+class MainHandler(RequestHandler):
     """
     Give the application name and the current version.
     """
+
     async def get(self):
-        response = {
-            "name": "Thoth Label Classifier",
-            "version": __version__
-        }
+        response = {"name": "Thoth Label Classifier", "version": __version__}
         self.write(response)
         self.finish()
 
